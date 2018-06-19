@@ -43,7 +43,7 @@ Object.prototype.deepClone = function() {
 };
 Object.defineProperty(Object.prototype, 'deepClone', {enumerable: false});
 //十六进制字符串转字节数组  
-function Str2Bytes(str) {  
+function str2Bytes(str) {  
     var pos = 0; 
     var len = str.length;  
     if(len%2 != 0) {  
@@ -60,7 +60,7 @@ function Str2Bytes(str) {
     return hexA;  
 }    
 //字节数组转十六进制字符串  
-function Bytes2Str(arr) {  
+function bytes2Str(arr) {  
     var str = "";  
     if(arr == undefined) {
       return;
@@ -85,8 +85,8 @@ function bigisZero(big) {
 }
 module.exports = {
     randomWord,
-    Str2Bytes,
-    Bytes2Str,
+    str2Bytes,
+    bytes2Str,
     bigisZero,
     deepClone
 }

@@ -27,17 +27,17 @@ var srp6aBase = {
 };
 
 function Srp6aBase() {
-	this.GenerateSalt = function() {  // generate salt
+	this.generateSalt = function() {  // generate salt
 	   var salt = new Array(MinSaltSize);
-	   var err = this.RandomBytes(salt);
+	   var err = this.randomBytes(salt);
 	   if (err != emptyString) {
 	   	  return emptyString;
 	   }
-	   salt = commonFun.Bytes2Str(salt[salt.length-1]);  // 将其转为16进制字符串
+	   salt = commonFun.bytes2Str(salt[salt.length-1]);  // 将其转为16进制字符串
 	   return salt;
 	}
 
-	this.RandomBytes = function(arr) { //random generate
+	this.randomBytes = function(arr) { //random generate
 		var err;
 		if (arr.length <= 0) {
 			err = "Parameter Error";
@@ -100,7 +100,7 @@ function Srp6aBase() {
 		b._N = new Array(b.byteLen);
 	    b.iN = bigInterger(N, 16);
 		var b_iN = bigInterger(b.iN).toString(16);
-		var v_iN = commonFun.Str2Bytes(b_iN);
+		var v_iN = commonFun.str2Bytes(b_iN);
 		this._padCopy(b._N, v_iN);
 	    
 		b._g = new Array(b.byteLen);
@@ -126,7 +126,7 @@ function Srp6aBase() {
 		this._padCopy(buf2, B);
 		var u_temp = h.update(buf1).update(buf2).digest("hex").toString();
 		
-		var u = commonFun.Str2Bytes(u_temp);
+		var u = commonFun.str2Bytes(u_temp);
 		for (var i = u.length - 1; i >= 0; i--) {
 			if (u[i] != 0) {
 				return u;
@@ -150,7 +150,7 @@ function Srp6aBase() {
 		}
 	}
 
-	Srp6aBase.prototype.ComputeM1 = function(b) {
+	Srp6aBase.prototype.computeM1 = function(b) {
 		if (b._M1.length == 0 && b.err == emptyString) {
 			if (b._A.length == 0 || b._B.length == 0) {
 				b.err = "A or B is not set yet";
@@ -170,7 +170,7 @@ function Srp6aBase() {
 			this._padCopy(buf3, b._S);
 			var u_temp = h.update(buf1).update(buf2).update(buf3).digest("hex").toString();
 			
-			var u = commonFun.Str2Bytes(u_temp);
+			var u = commonFun.str2Bytes(u_temp);
 			for (var i = u.length - 1; i >= 0; i--) {
 				if (u[i] != 0) {
 					return u;
@@ -180,9 +180,9 @@ function Srp6aBase() {
 		}
 	}
 
-	Srp6aBase.prototype.ComputeM2 = function(b) {
+	Srp6aBase.prototype.computeM2 = function(b) {
 		if (b._M2.length == 0 && b.err == emptyString) {
-			var Mtemp = this.ComputeM1(b);
+			var Mtemp = this.computeM1(b);
 			if (b.err != emptyString  && Mtemp == undefined && Mtemp.length == 0) {
 				return emptyString;
 			}
@@ -197,7 +197,7 @@ function Srp6aBase() {
 			this._padCopy(buf2, b._S);
 			var u_temp = h.update(buf1).update(b._M1).update(buf2).digest('hex')
 
-			b._M2 = commonFun.Str2Bytes(u_temp);
+			b._M2 = commonFun.str2Bytes(u_temp);
 			
 		}
 		return b._M2;
@@ -209,13 +209,13 @@ function Srp6aServer() {
 	Srp6aServer.prototype.ib = bigInterger(0);
 	Srp6aServer.prototype.iA = bigInterger(0);
 
-	Srp6aServer.prototype.SetV = function(v) {
+	Srp6aServer.prototype.setV = function(v) {
 	   if (commonFun.bigisZero(this.iv)&& this.err == emptyString && v != arrEmpty) {
 	   		this.iv = bigInterger.fromArray(v, 256);
 	   }
 	}
 
-	Srp6aServer.prototype.SetA = function(A) {
+	Srp6aServer.prototype.setA = function(A) {
 		if (this.err == emptyString && A != arrEmpty) {
 			if (A.length > this.byteLen) {
 				this.err = "Invalid A, too large";
@@ -233,7 +233,7 @@ function Srp6aServer() {
 		}
 	}
  
-	Srp6aServer.prototype._set_b = function(b) {
+	Srp6aServer.prototype._setB = function(b) {
 		this.ib = bigInterger(b, 16);
 	    // Compute: B = (k*v + g^b) % N
 	    // Test console.log(bigInterger(bigInterger(111)).multiply(bigInterger(111)));
@@ -249,23 +249,23 @@ function Srp6aServer() {
 
 	    this._B = new Array(this.byteLen);
 	    var b_iN = bigInterger(i3).toString(16);
-		var v_iN = commonFun.Str2Bytes(b_iN);
+		var v_iN = commonFun.str2Bytes(b_iN);
 	    this._padCopy(this._B, v_iN);
 		return this._B;
 	}
-	Srp6aServer.prototype.GenerateB = function() {
+	Srp6aServer.prototype.generateB = function() {
 		if (this._B.length == 0 && this.err == emptyString) {
 			var buf = Array.apply(null, Array(randomSize)).map(function(item, i) {
 				    return 0;
 				});
 			for (;this._B.length == 0;) {
-				var err = this.RandomBytes(buf);
+				var err = this.randomBytes(buf);
 				if (err != emptyString) {
 					this.err = err;
 					return emptyString;
 				}
-				var newbuf = commonFun.Bytes2Str(buf[buf.length-1]);  // 将其转为16进制字符串
-				_set_b(newbuf);
+				var newbuf = commonFun.bytes2Str(buf[buf.length-1]);  // 将其转为16进制字符串
+				_setB(newbuf);
 
 				if (this._A.length > 0) {
 					var u = _computeU(this.hasher, this.byteLen, this._A, this._B);
@@ -279,13 +279,13 @@ function Srp6aServer() {
 		}
 		return this._B;
 	}
-	Srp6aServer.prototype.ServerComputeS = function() {
+	Srp6aServer.prototype.serverComputeS = function() {
 		if (this._S.length == 0 && this.err == emptyString) {
 			if (this._A.length == 0 || commonFun.bigisZero(this.iv)) {
 				this.err = "A or v is not set yet";
 				return emptyString;
 			}
-			this.GenerateB();
+			this.generateB();
 			this._compute_u(this);
 			if (this.err != emptyString) {
 				return emptyString;
@@ -298,7 +298,7 @@ function Srp6aServer() {
 			i1 = bigInterger(i1).modPow(this.ib, this.iN);
 
 			var b_i1 = bigInterger(i1).toString(16);
-		    var v_i1 = commonFun.Str2Bytes(b_i1);
+		    var v_i1 = commonFun.str2Bytes(b_i1);
 		    this._S = new Array(this.byteLen);
 			this._padCopy(this._S, v_i1);
 		}
@@ -326,12 +326,12 @@ function Srp6aClient() {
 	Srp6aClient.prototype.iB = bigInterger(0);
 	Srp6aClient.prototype._v = [];
 
-	Srp6aClient.prototype.SetIdentity = function(id, pass) {
+	Srp6aClient.prototype.setIdentity = function(id, pass) {
 		this.identity = id;
 		this.pass = pass;
 	}
 
-	Srp6aClient.prototype.SetSalt = function(salt) {
+	Srp6aClient.prototype.setSalt = function(salt) {
 		if (this.salt.length == 0 && (this.err == emptyString) && salt.length != 0) {
 			this.salt = new Array(salt.length);
 			this._padCopy(this.salt, salt);
@@ -339,8 +339,8 @@ function Srp6aClient() {
 		}
 		return false;
 	}
-
-	Srp6aClient.prototype._compute_x = function() {
+    // compute x 
+	Srp6aClient.prototype._computeX = function() {
 		if (commonFun.bigisZero(this.ix) && this.err == emptyString) {
 			if (this.identity.length == 0 || this.pass.length == 0 || this.salt.length == 0) {
 				this.err = "id, pass or salt not set yet";
@@ -357,13 +357,13 @@ function Srp6aClient() {
 	        this.ix = bigInterger(newBuf, 16);
 		}
 	}
-	Srp6aClient.prototype.ComputeV = function() {
+	Srp6aClient.prototype.computeV = function() {
 		if (this._v.length == 0 && (this.err == emptyString)) {
 			if (commonFun.bigisZero(this.iN)) {
 				this.err = "Parameters (g,N) not set yet";
 				return arrEmpty;
 			}	
-			this._compute_x();
+			this._computeX();
 			if (this.err != emptyString) {
 				return emptyString;
 			}
@@ -371,12 +371,12 @@ function Srp6aClient() {
 			this._v = new Array(this.byteLen);
 			var i1 = bigInterger(this.ig).modPow(this.ix, this.iN);
 			var b_iN = bigInterger(i1).toString(16);
-			var v_iN = commonFun.Str2Bytes(b_iN);
+			var v_iN = commonFun.str2Bytes(b_iN);
 			this._padCopy(this._v, v_iN);
 		}
 		return this._v;
 	}
-	Srp6aClient.prototype._set_a = function(a) {
+	Srp6aClient.prototype._setA = function(a) {
 		this.ia = bigInterger(a, 16);
 	    // console.log(this.ia, this.iN)
 	    // Compute: A = g^a % N 
@@ -385,13 +385,14 @@ function Srp6aClient() {
 			return arrEmpty;
 		}
 		var b_i1 = bigInterger(i1).toString(16);
-		var v_i1 = commonFun.Str2Bytes(b_i1);
+		var v_i1 = commonFun.str2Bytes(b_i1);
 
 		this._A = new Array(this.byteLen);
 		this._padCopy(this._A, v_i1);
 		return this._A;
-	}
-	Srp6aClient.prototype.SetB = function(B) {
+	} 
+	// set B
+	Srp6aClient.prototype.setB = function(B) {
 		if (this.err == emptyString && B != arrEmpty) {
 			if (B.length > this.byteLen) {
 				this.err = "Invalid B, too large";
@@ -408,7 +409,7 @@ function Srp6aClient() {
 			}
 		}
 	}
-	Srp6aClient.prototype.GenerateA = function() {
+	Srp6aClient.prototype.generateA = function() {
 		if (this._A.length == 0 && this.err == emptyString) {
 			if (commonFun.bigisZero(this.iN)) {
 				this.err = "Parameters (g,N) not set yet";
@@ -419,25 +420,25 @@ function Srp6aClient() {
 			    return 0;
 			});
 			while(this._A.length == 0) {
-				err = this.RandomBytes(buf);
+				err = this.randomBytes(buf);
 				if (err != emptyString) {
 					this.err = err;
 					return emptyString;
 				}
-				var newbuf = commonFun.Bytes2Str(buf[buf.length-1]);  // 将其转为16进制字符串
-				_set_a(newbuf);
+				var newbuf = commonFun.bytes2Str(buf[buf.length-1]);  // 将其转为16进制字符串
+				_setA(newbuf);
 			}
 		}
 		return this._A;
 	}
-	Srp6aClient.prototype.ClientComputeS = function() {
+	Srp6aClient.prototype.clientComputeS = function() {
 		if (this._S.length == 0 && this.err == emptyString) {
 			if (this._B.length == 0) {
 				this.err = "B is not set yet";
 				return emptyString;
 			}
-			this.GenerateA();
-			this._compute_x();
+			this.generateA();
+			this._computeX();
 			this._compute_u(this);
 			if (this.err != emptyString) {
 				return emptyString;
@@ -459,7 +460,7 @@ function Srp6aClient() {
 			var u2 = bigInterger(i1).modPow(u1, this.iN);
 
 			var b_i1 = bigInterger(u2).toString(16);
-		    var v_i1 = commonFun.Str2Bytes(b_i1);
+		    var v_i1 = commonFun.str2Bytes(b_i1);
 			this._padCopy(this._S, v_i1);
 
 		}
@@ -489,36 +490,36 @@ function TestSrp6aFixedParam() {
 	var id2 = "alice122";
 	var pass2 = "password123";
 
-	var salt =commonFun.Str2Bytes(hexSalt);// // console.log(hash.utils.toArray(hexn));   
+	var salt =commonFun.str2Bytes(hexSalt);// // console.log(hash.utils.toArray(hexn));   
 
 	var srv = NewServer(2, N, 1024,"SHA1");
 	var cli = NewClient(2,N,1024,"SHA1");
-	cli.SetIdentity(id, pass); // 设置cli的id,pass
-	cli.SetSalt(salt);  // 设置cli的salt
+	cli.setIdentity(id, pass); // 设置cli的id,pass
+	cli.setSalt(salt);  // 设置cli的salt
 
-	var v= cli.ComputeV();  // 计算cli的_v
-	srv.SetV(v);  // src设置iv
+	var v= cli.computeV();  // 计算cli的_v
+	srv.setV(v);  // src设置iv
     
-	var A = cli._set_a(a)   // cli设置a
-	srv.SetA(A);   // srv设置A；
+	var A = cli._setA(a)   // cli设置a
+	srv.setA(A);   // srv设置A；
   
-	var B = srv._set_b(b);   // srv设置b
-	cli.SetB(B);   // cli设置B
+	var B = srv._setB(b);   // srv设置b
+	cli.setB(B);   // cli设置B
 
-	var S1 = srv.ServerComputeS(); // 计算srv的S
-	var S1Hex = commonFun.Bytes2Str(S1);
-	var S2 = cli.ClientComputeS(); // 计算cli的S
-	var S2Hex = commonFun.Bytes2Str(S2);
+	var S1 = srv.serverComputeS(); // 计算srv的S
+	var S1Hex = commonFun.bytes2Str(S1);
+	var S2 = cli.clientComputeS(); // 计算cli的S
+	var S2Hex = commonFun.bytes2Str(S2);
 	console.log("S1: ", S1.toString(16))
 	console.log("S2: ", S2.toString(16))
 	console.log("------------------")
 	console.log("S1 hex: ", S1Hex)
 	console.log("S2 hex: ", S1Hex)
 	
-	var M11 = srv.ComputeM1(srv);
-	var M12 = cli.ComputeM1(cli);
-	var M11Hex = commonFun.Bytes2Str(M11);
-	var M12Hex = commonFun.Bytes2Str(M12);
+	var M11 = srv.computeM1(srv);
+	var M12 = cli.computeM1(cli);
+	var M11Hex = commonFun.bytes2Str(M11);
+	var M12Hex = commonFun.bytes2Str(M12);
 	console.log("--------M1----------")
 	console.log("M11: ", M11.toString())
 	console.log("M12: ", M12.toString())
@@ -526,10 +527,10 @@ function TestSrp6aFixedParam() {
 	console.log("M11 hex: ", M11Hex)
 	console.log("M12 hex: ", M12Hex)
 
-	var M21 = srv.ComputeM2(srv);
-	var M22 = cli.ComputeM2(cli);
-	var M21Hex = commonFun.Bytes2Str(M21);
-	var M22Hex = commonFun.Bytes2Str(M22);
+	var M21 = srv.computeM2(srv);
+	var M22 = cli.computeM2(cli);
+	var M21Hex = commonFun.bytes2Str(M21);
+	var M22Hex = commonFun.bytes2Str(M22);
 	console.log("--------M2----------")
 	console.log("M21: ", M21.toString())
 	console.log("M22: ",M22.toString())
