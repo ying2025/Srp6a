@@ -62,6 +62,9 @@ function Str2Bytes(str) {
 //字节数组转十六进制字符串  
 function Bytes2Str(arr) {  
     var str = "";  
+    if(arr == undefined) {
+      return;
+    }
     for(var i=0; i<arr.length; i++){  
        var tmp = arr[i].toString(16);  
        if(tmp.length == 1) {  
