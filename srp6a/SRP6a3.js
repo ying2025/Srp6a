@@ -25,106 +25,146 @@ var srp6aBase = {
 	_M2: [],
 	_K: []
 };
+function GenerateSalt() {  // generate salt
+   var salt = new Array(MinSaltSize);
+   var err = RandomBytes(salt);
+   if (err != emptyString) {
+   	  return emptyString;
+   }
+   salt = commonFun.Bytes2Str(salt[salt.length-1]);  // 将其转为16进制字符串
+   return salt;
+}
+function RandomBytes(arr) { //random generate
+	var err;
+	if (arr.length <= 0) {
+		err = "Parameter Error";
+		return err; // return err
+	}
+	var rand = commonFun.randomWord(true, MinSaltSize, MinSaltSize);
+	if (rand.length == 0) {
+		err = "Generate Error";
+		return err; 
+	}
+	arr.push(rand);
+	return emptyString;
+}
 
-function Srp6aBase() {
-	this.GenerateSalt = function() {  // generate salt
-	   var salt = new Array(MinSaltSize);
-	   var err = this.RandomBytes(salt);
-	   if (err != emptyString) {
-	   	  return emptyString;
-	   }
-	   salt = commonFun.Bytes2Str(salt[salt.length-1]);  // 将其转为16进制字符串
-	   return salt;
+// Array copy to array 
+function padCopy(dst, src) {
+	if (src == undefined || dst.length < src.length) {
+		console.error("Cann't reach here, dst length is shorter than src");
+		return;
+	}
+	var n = dst.length - src.length;
+
+	for (var i = 0; i < src.length; i++) {
+		if (typeof src[i] == "string") {
+			src[i] = parseInt(src[i]);
+		}
+		dst[i+n] = src[i];
+	}
+   
+	for (n--; n >= 0; n--) {
+		dst[n] = 0;
+	}
+}
+
+function setHash(b, hashName) {
+	if (hashName == 'SHA1') {
+		b.hashName = 'SHA1';
+		b.hasher   = hash.sha1;
+	} else if(hashName == "SHA256") {
+		b.hashName = "SHA256";
+		b.hasher   = hash.sha256;
+	} else {
+		b.err = "Unsupported hash";
+	}
+}
+function setParameter(b, g, N, bits) {
+	if (b.err != emptyString) {
+		return;
 	}
 
-	this.RandomBytes = function(arr) { //random generate
-		var err;
-		if (arr.length <= 0) {
-			err = "Parameter Error";
-			return err; // return err
-		}
-		var rand = commonFun.randomWord(true, MinSaltSize, MinSaltSize);
-		if (rand.length == 0) {
-			err = "Generate Error";
-			return err; 
-		}
-		arr.push(rand);
+	if (bits < 512 && bits < N.length * 8) {
+		b.err = "bits must be 512 or above, and be len(N)*8 or above";
+		return;
+	}
+	b.bits = bits;
+	b.byteLen = parseInt((bits + 7) / 8);
+	b.ig = bigInterger(g);  
+
+	b._N = new Array(b.byteLen);
+    b.iN = bigInterger(N, 16);
+	var b_iN = bigInterger(b.iN).toString(16);
+	var v_iN = commonFun.Str2Bytes(b_iN);
+	padCopy(b._N, v_iN);
+    
+	b._g = new Array(b.byteLen);
+	var b_ig = bigInterger(b.ig).toString(16);
+	// PAD(g)
+	padCopy(b._g, b_ig);
+
+    // Compute: k = SHA1(N | PAD(g)) 
+	var h = b.hasher();
+	var ghash = h.update(b._N).update(b._g).digest("hex");
+	b.ik = bigInterger(ghash, 16);
+}
+
+function computeU(hasher, bufLen, A, B) {
+	if (A.length == 0 || B.length == 0) {
 		return emptyString;
 	}
-
-	// Array copy to array 
-	this._padCopy = function(dst, src) {
-		if (src == undefined || dst.length < src.length) {
-			console.error("Cann't reach here, dst length is shorter than src");
-			return;
-		}
-		var n = dst.length - src.length;
-
-		for (var i = 0; i < src.length; i++) {
-			if (typeof src[i] == "string") {
-				src[i] = parseInt(src[i]);
-			}
-			dst[i+n] = src[i];
-		}
-	   
-		for (n--; n >= 0; n--) {
-			dst[n] = 0;
+	// Compute: u = SHA1(PAD(A) | PAD(B))
+	var buf1 = new Array(bufLen);
+	var buf2 = new Array(bufLen);
+	var h = hasher();
+	padCopy(buf1, A);
+	padCopy(buf2, B);
+	var u_temp = h.update(buf1).update(buf2).digest("hex").toString();
+	
+	var u = commonFun.Str2Bytes(u_temp);
+	for (var i = u.length - 1; i >= 0; i--) {
+		if (u[i] != 0) {
+			return u;
 		}
 	}
-
-	this._setHash = function(b, hashName) {
-		if (hashName == 'SHA1') {
-			b.hashName = 'SHA1';
-			b.hasher   = hash.sha1;
-		} else if(hashName == "SHA256") {
-			b.hashName = "SHA256";
-			b.hasher   = hash.sha256;
-		} else {
-			b.err = "Unsupported hash";
-		}
-	}
-
-	this._setParameter = function(b, g, N, bits) {
-		if (b.err != emptyString) {
+	return emptyString;
+}
+// Compute U
+function compute_u(b) {
+	// Compute u = H(A, B)
+	if (b._u.length == 0 && b.err == emptyString) {
+		if (b._A.length == 0 || b._B.length == 0) {
+			b.err = "A or B not set yet";
 			return;
 		}
-
-		if (bits < 512 && bits < N.length * 8) {
-			b.err = "bits must be 512 or above, and be len(N)*8 or above";
+		b._u = computeU(b.hasher, b.byteLen, b._A, b._B);
+		if (b._u.length == 0) {
+			b.err = "u can't be 0";
 			return;
 		}
-		b.bits = bits;
-		b.byteLen = parseInt((bits + 7) / 8);
-		b.ig = bigInterger(g);  
-
-		b._N = new Array(b.byteLen);
-	    b.iN = bigInterger(N, 16);
-		var b_iN = bigInterger(b.iN).toString(16);
-		var v_iN = commonFun.Str2Bytes(b_iN);
-		this._padCopy(b._N, v_iN);
-	    
-		b._g = new Array(b.byteLen);
-		var b_ig = bigInterger(b.ig).toString(16);
-		// PAD(g)
-		this._padCopy(b._g, b_ig);
-
-	    // Compute: k = SHA1(N | PAD(g)) 
-		var h = b.hasher();
-		var ghash = h.update(b._N).update(b._g).digest("hex");
-		b.ik = bigInterger(ghash, 16);
 	}
-
-	this._computeU = function(hasher, bufLen, A, B) {
-		if (A.length == 0 || B.length == 0) {
+}
+// Compute M1
+function ComputeM1(b) {
+	if (b._M1.length == 0 && b.err == emptyString) {
+		if (b._A.length == 0 || b._B.length == 0) {
+			b.err = "A or B is not set yet";
 			return emptyString;
 		}
-		// Compute: u = SHA1(PAD(A) | PAD(B))
-		var buf1 = new Array(bufLen);
-		var buf2 = new Array(bufLen);
-		var h = hasher();
-		this._padCopy(buf1, A);
-		this._padCopy(buf2, B);
-		var u_temp = h.update(buf1).update(buf2).digest("hex").toString();
+		if (b._S.length == 0) {
+			b.err = "S must be computed before M1 and M2";
+			return emptyString;
+		}
+		// Compute: M1 = SHA1(PAD(A) | PAD(B) | PAD(S))
+		var buf1 = new Array(b.byteLen);
+		var buf2 = new Array(b.byteLen);
+		var buf3 = new Array(b.byteLen);
+        var h = b.hasher();
+		padCopy(buf1, b._A);
+		padCopy(buf2, b._B);
+		padCopy(buf3, b._S);
+		var u_temp = h.update(buf1).update(buf2).update(buf3).digest("hex").toString();
 		
 		var u = commonFun.Str2Bytes(u_temp);
 		for (var i = u.length - 1; i >= 0; i--) {
@@ -134,74 +174,29 @@ function Srp6aBase() {
 		}
 		return emptyString;
 	}
-
-	this._compute_u = function(b) {
-		// Compute u = H(A, B)
-		if (b._u.length == 0 && b.err == emptyString) {
-			if (b._A.length == 0 || b._B.length == 0) {
-				b.err = "A or B not set yet";
-				return;
-			}
-			b._u = this._computeU(b.hasher, b.byteLen, b._A, b._B);
-			if (b._u.length == 0) {
-				b.err = "u can't be 0";
-				return;
-			}
-		}
-	}
-
-	Srp6aBase.prototype.ComputeM1 = function(b) {
-		if (b._M1.length == 0 && b.err == emptyString) {
-			if (b._A.length == 0 || b._B.length == 0) {
-				b.err = "A or B is not set yet";
-				return emptyString;
-			}
-			if (b._S.length == 0) {
-				b.err = "S must be computed before M1 and M2";
-				return emptyString;
-			}
-			// Compute: M1 = SHA1(PAD(A) | PAD(B) | PAD(S))
-			var buf1 = new Array(b.byteLen);
-			var buf2 = new Array(b.byteLen);
-			var buf3 = new Array(b.byteLen);
-	        var h = b.hasher();
-			this._padCopy(buf1, b._A);
-			this._padCopy(buf2, b._B);
-			this._padCopy(buf3, b._S);
-			var u_temp = h.update(buf1).update(buf2).update(buf3).digest("hex").toString();
-			
-			var u = commonFun.Str2Bytes(u_temp);
-			for (var i = u.length - 1; i >= 0; i--) {
-				if (u[i] != 0) {
-					return u;
-				}
-			}
+}
+// Compute M2
+function ComputeM2(b) {
+	if (b._M2.length == 0 && b.err == emptyString) {
+		var Mtemp = ComputeM1(b);
+		if (b.err != emptyString  && Mtemp == undefined && Mtemp.length == 0) {
 			return emptyString;
 		}
-	}
+		b._M1 = new Array(Mtemp.length);
+		padCopy(b._M1, Mtemp);
+		
+		// Compute: M2 = SHA1(PAD(A) | M1 | PAD(S)) 
+		var buf1 = new Array(b.byteLen);
+		var buf2 = new Array(b.byteLen);
+		var h = b.hasher();
+		padCopy(buf1, b._A);
+		padCopy(buf2, b._S);
+		var u_temp = h.update(buf1).update(b._M1).update(buf2).digest('hex')
 
-	Srp6aBase.prototype.ComputeM2 = function(b) {
-		if (b._M2.length == 0 && b.err == emptyString) {
-			var Mtemp = this.ComputeM1(b);
-			if (b.err != emptyString  && Mtemp == undefined && Mtemp.length == 0) {
-				return emptyString;
-			}
-			b._M1 = new Array(Mtemp.length);
-			this._padCopy(b._M1, Mtemp);
-			
-			// Compute: M2 = SHA1(PAD(A) | M1 | PAD(S)) 
-			var buf1 = new Array(b.byteLen);
-			var buf2 = new Array(b.byteLen);
-			var h = b.hasher();
-			this._padCopy(buf1, b._A);
-			this._padCopy(buf2, b._S);
-			var u_temp = h.update(buf1).update(b._M1).update(buf2).digest('hex')
-
-			b._M2 = commonFun.Str2Bytes(u_temp);
-			
-		}
-		return b._M2;
+		b._M2 = commonFun.Str2Bytes(u_temp);
+		
 	}
+	return b._M2;
 }
 
 function Srp6aServer() {
@@ -228,12 +223,12 @@ function Srp6aServer() {
 					return;
 				}
 				this._A = new Array(this.byteLen);
-				this._padCopy(this._A, A);
+				padCopy(this._A, A);
 			}
 		}
 	}
  
-	Srp6aServer.prototype._set_b = function(b) {
+	Srp6aServer.prototype.set_b = function(b) {
 		this.ib = bigInterger(b, 16);
 	    // Compute: B = (k*v + g^b) % N
 	    // Test console.log(bigInterger(bigInterger(111)).multiply(bigInterger(111)));
@@ -250,7 +245,7 @@ function Srp6aServer() {
 	    this._B = new Array(this.byteLen);
 	    var b_iN = bigInterger(i3).toString(16);
 		var v_iN = commonFun.Str2Bytes(b_iN);
-	    this._padCopy(this._B, v_iN);
+	    padCopy(this._B, v_iN);
 		return this._B;
 	}
 	Srp6aServer.prototype.GenerateB = function() {
@@ -259,16 +254,16 @@ function Srp6aServer() {
 				    return 0;
 				});
 			for (;this._B.length == 0;) {
-				var err = this.RandomBytes(buf);
+				var err = RandomBytes(buf);
 				if (err != emptyString) {
 					this.err = err;
 					return emptyString;
 				}
 				var newbuf = commonFun.Bytes2Str(buf[buf.length-1]);  // 将其转为16进制字符串
-				_set_b(newbuf);
+				set_b(newbuf);
 
 				if (this._A.length > 0) {
-					var u = _computeU(this.hasher, this.byteLen, this._A, this._B);
+					var u = computeU(this.hasher, this.byteLen, this._A, this._B);
 					if (u.length == 0) {
 						this._B = arrEmpty;
 					} else {
@@ -286,7 +281,7 @@ function Srp6aServer() {
 				return emptyString;
 			}
 			this.GenerateB();
-			this._compute_u(this);
+			compute_u(this);
 			if (this.err != emptyString) {
 				return emptyString;
 			}
@@ -300,24 +295,23 @@ function Srp6aServer() {
 			var b_i1 = bigInterger(i1).toString(16);
 		    var v_i1 = commonFun.Str2Bytes(b_i1);
 		    this._S = new Array(this.byteLen);
-			this._padCopy(this._S, v_i1);
+			padCopy(this._S, v_i1);
 		}
 		return this._S;
 	}
 }
-Srp6aServer.prototype = new Srp6aBase();
+
 function NewServer(g, N, bits, hashName) {
 	// srv = Object.assign(srp6aBase, Srp6aServer); 
 	var srv = new Srp6aServer();
 	srv = Object.assign(srv, commonFun.deepClone(srp6aBase)); 
-	srv._setHash(srv, hashName);
-	srv._setParameter(srv, g, N, bits);
+	setHash(srv, hashName);
+	setParameter(srv, g, N, bits);
 	return srv;
 }
 
 // Client
 function Srp6aClient() {
-	
 	Srp6aClient.prototype.identity = '';
 	Srp6aClient.prototype.pass = '';
 	Srp6aClient.prototype.salt = [];
@@ -334,13 +328,13 @@ function Srp6aClient() {
 	Srp6aClient.prototype.SetSalt = function(salt) {
 		if (this.salt.length == 0 && (this.err == emptyString) && salt.length != 0) {
 			this.salt = new Array(salt.length);
-			this._padCopy(this.salt, salt);
+			padCopy(this.salt, salt);
 			return true;
 		}
 		return false;
 	}
 
-	Srp6aClient.prototype._compute_x = function() {
+	Srp6aClient.prototype.compute_x = function() {
 		if (commonFun.bigisZero(this.ix) && this.err == emptyString) {
 			if (this.identity.length == 0 || this.pass.length == 0 || this.salt.length == 0) {
 				this.err = "id, pass or salt not set yet";
@@ -363,7 +357,7 @@ function Srp6aClient() {
 				this.err = "Parameters (g,N) not set yet";
 				return arrEmpty;
 			}	
-			this._compute_x();
+			this.compute_x();
 			if (this.err != emptyString) {
 				return emptyString;
 			}
@@ -372,11 +366,11 @@ function Srp6aClient() {
 			var i1 = bigInterger(this.ig).modPow(this.ix, this.iN);
 			var b_iN = bigInterger(i1).toString(16);
 			var v_iN = commonFun.Str2Bytes(b_iN);
-			this._padCopy(this._v, v_iN);
+			padCopy(this._v, v_iN);
 		}
 		return this._v;
 	}
-	Srp6aClient.prototype._set_a = function(a) {
+	Srp6aClient.prototype.set_a = function(a) {
 		this.ia = bigInterger(a, 16);
 	    // console.log(this.ia, this.iN)
 	    // Compute: A = g^a % N 
@@ -388,7 +382,7 @@ function Srp6aClient() {
 		var v_i1 = commonFun.Str2Bytes(b_i1);
 
 		this._A = new Array(this.byteLen);
-		this._padCopy(this._A, v_i1);
+		padCopy(this._A, v_i1);
 		return this._A;
 	}
 	Srp6aClient.prototype.SetB = function(B) {
@@ -404,7 +398,7 @@ function Srp6aClient() {
 					return;
 				}
 				this._B = new Array(this.byteLen);
-				this._padCopy(this._B, B);
+				padCopy(this._B, B);
 			}
 		}
 	}
@@ -419,13 +413,13 @@ function Srp6aClient() {
 			    return 0;
 			});
 			while(this._A.length == 0) {
-				err = this.RandomBytes(buf);
+				err = RandomBytes(buf);
 				if (err != emptyString) {
 					this.err = err;
 					return emptyString;
 				}
 				var newbuf = commonFun.Bytes2Str(buf[buf.length-1]);  // 将其转为16进制字符串
-				_set_a(newbuf);
+				set_a(newbuf);
 			}
 		}
 		return this._A;
@@ -437,8 +431,8 @@ function Srp6aClient() {
 				return emptyString;
 			}
 			this.GenerateA();
-			this._compute_x();
-			this._compute_u(this);
+			this.compute_x();
+			compute_u(this);
 			if (this.err != emptyString) {
 				return emptyString;
 			}
@@ -460,19 +454,18 @@ function Srp6aClient() {
 
 			var b_i1 = bigInterger(u2).toString(16);
 		    var v_i1 = commonFun.Str2Bytes(b_i1);
-			this._padCopy(this._S, v_i1);
+			padCopy(this._S, v_i1);
 
 		}
 		return this._S;
 	}
 
 }
-Srp6aClient.prototype = new Srp6aBase();
 function NewClient(g, N, bits, hashName) {
 		var cli = new Srp6aClient();
 		cli = Object.assign(cli, commonFun.deepClone(srp6aBase));
-		cli._setHash(cli, hashName);
-		cli._setParameter(cli, g, N, bits);
+		setHash(cli, hashName);
+		setParameter(cli, g, N, bits);
 		return cli;
 }
 function TestSrp6aFixedParam() {
@@ -499,10 +492,10 @@ function TestSrp6aFixedParam() {
 	var v= cli.ComputeV();  // 计算cli的_v
 	srv.SetV(v);  // src设置iv
     
-	var A = cli._set_a(a)   // cli设置a
+	var A = cli.set_a(a)   // cli设置a
 	srv.SetA(A);   // srv设置A；
   
-	var B = srv._set_b(b);   // srv设置b
+	var B = srv.set_b(b);   // srv设置b
 	cli.SetB(B);   // cli设置B
 
 	var S1 = srv.ServerComputeS(); // 计算srv的S
@@ -515,8 +508,8 @@ function TestSrp6aFixedParam() {
 	console.log("S1 hex: ", S1Hex)
 	console.log("S2 hex: ", S1Hex)
 	
-	var M11 = srv.ComputeM1(srv);
-	var M12 = cli.ComputeM1(cli);
+	var M11 = ComputeM1(srv);
+	var M12 = ComputeM1(cli);
 	var M11Hex = commonFun.Bytes2Str(M11);
 	var M12Hex = commonFun.Bytes2Str(M12);
 	console.log("--------M1----------")
@@ -526,8 +519,8 @@ function TestSrp6aFixedParam() {
 	console.log("M11 hex: ", M11Hex)
 	console.log("M12 hex: ", M12Hex)
 
-	var M21 = srv.ComputeM2(srv);
-	var M22 = cli.ComputeM2(cli);
+	var M21 = ComputeM2(srv);
+	var M22 = ComputeM2(cli);
 	var M21Hex = commonFun.Bytes2Str(M21);
 	var M22Hex = commonFun.Bytes2Str(M22);
 	console.log("--------M2----------")
