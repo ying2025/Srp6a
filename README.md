@@ -6,5 +6,6 @@
       npm  install browserify -g. 
       browserify SRP6a.js > index.js
    Now you can use it in html just by
+   
       <script type="text/javascript" src="./index.js"></script>
    
