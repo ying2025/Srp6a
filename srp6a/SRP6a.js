@@ -1,11 +1,11 @@
 var hash = require('hash.js');  // 引入Hash
 var bigInterger = require("big-integer");  // 引入大整型
-var commonFun = require('./srp6aInterface.js'); // 引入公共函数部分
+var commonFun = require('./srp6aCommonFun.js'); // 引入公共函数部分
 var bigInt = bigInterger(0);
 var randomSize = 512/2/8;  // 随机数
 var MinSaltSize = 16;  // salt的最小
-var nil = "";   // 与err对比的
-var arrnil = [];
+var emptyString = "";   // 与err对比的
+var arrEmpty = [];
 var srv = {};   // Server
 var cli = {};  // client
 
@@ -31,8 +31,8 @@ var srp6aBase = {
 function GenerateSalt() {  // generate salt
    var salt = new Array(MinSaltSize);
    var err = RandomBytes(salt);
-   if (err != nil) {
-   	  return nil;
+   if (err != emptyString) {
+   	  return emptyString;
    }
    salt = commonFun.Bytes2Str(salt[salt.length-1]);  // 将其转为16进制字符串
    return salt;
@@ -49,7 +49,7 @@ function RandomBytes(arr) { //random generate
 		return err; 
 	}
 	arr.push(rand);
-	return nil;
+	return emptyString;
 }
 
 // Array copy to array 
@@ -84,7 +84,7 @@ function setHash(b, hashName) {
 	}
 }
 function setParameter(b, g, N, bits) {
-	if (b.err != nil) {
+	if (b.err != emptyString) {
 		return;
 	}
 	if (bits < 512 && bits < N.length * 8) {
@@ -114,7 +114,7 @@ function setParameter(b, g, N, bits) {
 
 function computeU(hasher, bufLen, A, B) {
 	if (A.length == 0 || B.length == 0) {
-		return nil;
+		return emptyString;
 	}
 	// Compute: u = SHA1(PAD(A) | PAD(B))
 	var buf1 = new Array(bufLen);
@@ -130,12 +130,12 @@ function computeU(hasher, bufLen, A, B) {
 			return u;
 		}
 	}
-	return nil;
+	return emptyString;
 }
 // Compute U
 function compute_u(b) {
 	// Compute u = H(A, B)
-	if (b._u.length == 0 && b.err == nil) {
+	if (b._u.length == 0 && b.err == emptyString) {
 		if (b._A.length == 0 || b._B.length == 0) {
 			b.err = "A or B not set yet";
 			return;
@@ -149,14 +149,14 @@ function compute_u(b) {
 }
 // Compute M1
 function ComputeM1(b) {
-	if (b._M1.length == 0 && b.err == nil) {
+	if (b._M1.length == 0 && b.err == emptyString) {
 		if (b._A.length == 0 || b._B.length == 0) {
 			b.err = "A or B is not set yet";
-			return nil;
+			return emptyString;
 		}
 		if (b._S.length == 0) {
 			b.err = "S must be computed before M1 and M2";
-			return nil;
+			return emptyString;
 		}
 		// Compute: M1 = SHA1(PAD(A) | PAD(B) | PAD(S))
 		var buf1 = new Array(b.byteLen);
@@ -174,15 +174,15 @@ function ComputeM1(b) {
 				return u;
 			}
 		}
-		return nil;
+		return emptyString;
 	}
 }
 // Compute M2
 function ComputeM2(b) {
-	if (b._M2.length == 0 && b.err == nil) {
+	if (b._M2.length == 0 && b.err == emptyString) {
 		var Mtemp = ComputeM1(b);
-		if (b.err != nil  && Mtemp == undefined && Mtemp.length == 0) {
-			return nil;
+		if (b.err != emptyString  && Mtemp == undefined && Mtemp.length == 0) {
+			return emptyString;
 		}
 		b._M1 = new Array(Mtemp.length);
 		padCopy(b._M1, Mtemp);
@@ -215,13 +215,13 @@ function NewServer(g, N, bits, hashName) {
 }
 // srv set V
 function SetV(v) {
-   if (commonFun.bigisZero(srv.iv)&& srv.err == nil && v != arrnil) {
+   if (commonFun.bigisZero(srv.iv)&& srv.err == emptyString && v != arrEmpty) {
    		srv.iv = bigInterger.fromArray(v, 256);
    }
 }
 
 function SetA(A) {
-	if (srv.err == nil && A != arrnil) {
+	if (srv.err == emptyString && A != arrEmpty) {
 		if (A.length > srv.byteLen) {
 			srv.err = "Invalid A, too large";
 			return;
@@ -249,7 +249,7 @@ function set_b(b) {
     var i3 = bigInterger(bigInterger(i1).add(i2)).mod(srv.iN);
 
     if (commonFun.bigisZero(i3)) {
-    	return arrnil;
+    	return arrEmpty;
     }
 
     srv._B = new Array(srv.byteLen);
@@ -259,15 +259,15 @@ function set_b(b) {
 	return srv._B;
 }
 function GenerateB() {
-	if (srv._B.length == 0 && srv.err == nil) {
+	if (srv._B.length == 0 && srv.err == emptyString) {
 		var buf = Array.apply(null, Array(randomSize)).map(function(item, i) {
 			    return 0;
 			});
 		for (;srv._B.length == 0;) {
 			var err = RandomBytes(buf);
-			if (err != nil) {
+			if (err != emptyString) {
 				srv.err = err;
-				return nil;
+				return emptyString;
 			}
 			var newbuf = commonFun.Bytes2Str(buf[buf.length-1]);  // 将其转为16进制字符串
 			set_b(newbuf);
@@ -275,7 +275,7 @@ function GenerateB() {
 			if (srv._A.length > 0) {
 				var u = computeU(srv.hasher, srv.byteLen, srv._A, srv._B);
 				if (u.length == 0) {
-					srv._B = arrnil;
+					srv._B = arrEmpty;
 				} else {
 					srv._u = u;
 				}
@@ -286,15 +286,15 @@ function GenerateB() {
 }
 // Server Compute S
 function ServerComputeS() {
-	if (srv._S.length == 0 && srv.err == nil) {
+	if (srv._S.length == 0 && srv.err == emptyString) {
 		if (srv._A.length == 0 || commonFun.bigisZero(srv.iv)) {
 			srv.err = "A or v is not set yet";
-			return nil;
+			return emptyString;
 		}
 		GenerateB();
 		compute_u(srv);
-		if (srv.err != nil) {
-			return nil;
+		if (srv.err != emptyString) {
+			return emptyString;
 		}
 		// Compute: S_host = (A * v^u) ^ b % N	
 		var iu = bigInterger.fromArray(srv._u, 256); // 根据数组生成对应的big类型
@@ -334,7 +334,7 @@ function SetIdentity(id, pass) {
 }
 // set random
 function SetSalt(salt) {
-	if (cli.salt.length == 0 && (cli.err == nil)) {
+	if (cli.salt.length == 0 && (cli.err == emptyString)) {
 		cli.salt = new Array(salt.length);
 		padCopy(cli.salt, salt);
 		return true;
@@ -343,7 +343,7 @@ function SetSalt(salt) {
 }
 // generate private key
 function compute_x() {
-	if (commonFun.bigisZero(cli.ix) && cli.err == nil) {
+	if (commonFun.bigisZero(cli.ix) && cli.err == emptyString) {
 		if (cli.identity.length == 0 || cli.pass.length == 0 || cli.salt.length == 0) {
 			cli.err = "id, pass or salt not set yet";
 			return;
@@ -361,14 +361,14 @@ function compute_x() {
 }
 
 function ComputeV() {
-	if (cli._v.length == 0 && (cli.err == nil)) {
+	if (cli._v.length == 0 && (cli.err == emptyString)) {
 		if (cli.iN.isZero()) {
 			cli.err = "Parameters (g,N) not set yet";
-			return arrnil;
+			return arrEmpty;
 		}	
 		compute_x();
-		if (cli.err != nil) {
-			return nil;
+		if (cli.err != emptyString) {
+			return emptyString;
 		}
 		// Compute: v = g^x % N 
 		cli._v = new Array(cli.byteLen);
@@ -386,7 +386,7 @@ function set_a(a) {
     // Compute: A = g^a % N 
 	var i1 = bigInterger(cli.ig).modPow(cli.ia, cli.iN);
 	if (commonFun.bigisZero(i1)) {
-		return arrnil;
+		return arrEmpty;
 	}
 	var b_i1 = bigInterger(i1).toString(16);
 	var v_i1 = commonFun.Str2Bytes(b_i1);
@@ -397,7 +397,7 @@ function set_a(a) {
 }
 // Client set B
 function SetB(B) {
-	if (cli.err == nil && B != arrnil) {
+	if (cli.err == emptyString && B != arrEmpty) {
 		if (B.length > cli.byteLen) {
 			cli.err = "Invalid B, too large";
 			return;
@@ -415,10 +415,10 @@ function SetB(B) {
 }
 // 生成A
 function GenerateA() {
-	if (cli._A.length == 0 && cli.err == nil) {
+	if (cli._A.length == 0 && cli.err == emptyString) {
 		if (commonFun.bigisZero(cli.iN)) {
 			cli.err = "Parameters (g,N) not set yet";
-			return nil;
+			return emptyString;
 		}
 		var err;
 		var buf = Array.apply(null, Array(randomSize)).map(function(item, i) {
@@ -426,9 +426,9 @@ function GenerateA() {
 		});
 		while(cli._A.length == 0) {
 			err = RandomBytes(buf);
-			if (err != nil) {
+			if (err != emptyString) {
 				cli.err = err;
-				return nil;
+				return emptyString;
 			}
 			var newbuf = commonFun.Bytes2Str(buf[buf.length-1]);  // 将其转为16进制字符串
 			set_a(newbuf);
@@ -438,16 +438,16 @@ function GenerateA() {
 }
 // 计算客户端的S
 function ClientComputeS() {
-	if (cli._S.length == 0 && cli.err == nil) {
+	if (cli._S.length == 0 && cli.err == emptyString) {
 		if (cli._B.length == 0) {
 			cli.err = "B is not set yet";
-			return nil;
+			return emptyString;
 		}
 		GenerateA();
 		compute_x();
 		compute_u(cli);
-		if (cli.err != nil) {
-			return nil;
+		if (cli.err != emptyString) {
+			return emptyString;
 		}
 		// Compute: S_user = (B - (k * g^x)) ^ (a + (u * x)) % N 
 		cli._S = new Array(cli.byteLen);
